@@ -6,12 +6,12 @@ WORKDIR /app
 # Enable corepack for pnpm
 RUN corepack enable
 
-# Copy package files
+# Copy all package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/types/package.json ./packages/types/
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
@@ -27,16 +27,23 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Enable corepack for pnpm
+RUN corepack enable
+
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
+
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod
+
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
-COPY --from=builder /app/packages/types/package.json ./packages/types/
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app
