@@ -1,0 +1,51 @@
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Enable corepack for pnpm
+RUN corepack enable
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/crawler/package.json ./apps/crawler/
+COPY packages/types/package.json ./packages/types/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY tsconfig.json ./
+COPY packages/types ./packages/types
+COPY apps/crawler ./apps/crawler
+
+# Build
+RUN pnpm turbo build --filter=@ai-sdk-registry/crawler
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Crawlee needs some additional dependencies
+RUN apk add --no-cache chromium
+
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Copy built files
+COPY --from=builder /app/apps/crawler/dist ./apps/crawler/dist
+COPY --from=builder /app/apps/crawler/package.json ./apps/crawler/
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
+COPY --from=builder /app/packages/types/package.json ./packages/types/
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+# Create data directory with write permissions
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app
+
+USER appuser
+
+ENV NODE_ENV=production
+
+CMD ["node", "apps/crawler/dist/index.js"]

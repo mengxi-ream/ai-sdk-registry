@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+  # For local testing - run crawler manually
+  crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    volumes:
+      - ./data:/app/data
+    profiles:
+      - crawl
+    environment:
+      - NODE_ENV=production
